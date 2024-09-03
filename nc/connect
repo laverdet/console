@@ -1,0 +1,54 @@
+#!/bin/sh
+set -eu
+
+# Common scripts
+export PATH
+PATH=$PATH:$PWD/bin
+
+# Parse `port1:port2`
+export NETCAT_HOST
+export NETCAT_PORT
+export NETCAT_PORT2
+NETCAT_PORT=${PORTS%+*}
+NETCAT_PORT2=${PORTS##*+}
+
+# Setup shell
+SH=$("$1/shell/locate-shell")
+"$1/shell/apply-motd" "$SH" <"$1/nc/netcat.motd"
+
+# Test shell
+echo "::group::Testing Shell: $SH -i -l"
+echo | "$SH" -i -l
+echo; echo "::endgroup::"
+
+# Run netcat loop
+echo "Run this on $NETCAT_HOST: nc -nlvp $NETCAT_PORT"
+PREVIOUS=$(date +%s)
+while true; do
+	FLAG=
+	case $NC_FLAVOR in
+		gnu|traditional-nt)
+			# These flavors accept expanded -e arguments
+			# nb: `pwsh.exe` does not support contracted `-il` argument
+			$NC "$NETCAT_HOST" "$NETCAT_PORT" -e "$SH -i -l" || FLAG=1
+			;;
+		*)
+			# Otherwise, pipes are our best option
+			rm -f console
+			mkfifo console
+			# shellcheck disable=SC2094
+			$SH -i -l <console 2>&1 | $NC "$NETCAT_HOST" "$NETCAT_PORT" >console || FLAG=1
+			;;
+
+	esac
+	if [ "$FLAG" = '' ]; then
+		echo "Lost connection."
+		PREVIOUS=$(date +%s)
+	elif [ $(($(date +%s) - PREVIOUS)) -gt "$TIMEOUT" ]; then
+		echo "Inactivity timeout."
+		break
+	else
+		NOW=$(date +%s)
+		while [ "$(date +%s)" = "$NOW" ]; do sleep 0.1; done
+	fi
+done

@@ -1,0 +1,63 @@
+#!/bin/sh
+set -eu
+SH=$1
+TIMEOUT=$2
+
+# Socket paths are named based on current pid, so we know where to find them easily.
+USOCKET=~/.upterm/console$$
+
+# Not needed but just a reminder. `upterm` will not overwrite an existing socket environment
+# variable which can be very confusing during development of this tool.
+unset UPTERM_ADMIN_SOCKET
+
+# Start daemonized upterm
+# nb: `pwsh.exe` does not support contracted `-il` argument, so make sure to use `-i -l` instead.
+# You also shouldn't need the `-i` flag since the shell should detect the pty but it sometimes
+# doesn't work, and doesn't hurt to add otherwise.
+REMOTE_COMMAND="$SH -i -l"
+case "$REMOTE_COMMAND" in
+	# Trampoline off `sh` first which does a better job of picking up terminal features.
+	*pwsh*) REMOTE_COMMAND="sh -c \"exec $REMOTE_COMMAND\""
+esac
+LOCAL_COMMAND="mv \"\$UPTERM_ADMIN_SOCKET\" "\'$USOCKET\'"; tail -f /dev/null"
+nohup upterm host \
+	--accept \
+	--authorized-keys ~/.ssh/authorized_keys \
+	--private-key ~/.ssh/upterm \
+	--force-command "$REMOTE_COMMAND"  \
+	-- sh -c "$LOCAL_COMMAND" &
+UPTERM_PID=$!
+trap 'kill $UPTERM_PID || true' EXIT
+
+# Wait for upterm admin socket
+STARTED=$(date +%s)
+while [ ! -e "$USOCKET" ] && [ $(($(date +%s) - STARTED)) -lt 2 ]; do sleep 0.1; done
+if [ ! -e "$USOCKET" ]; then
+	echo "Failed to start upterm host"
+	exit 1
+fi
+
+# Wait for first client
+STARTED=$(date +%s)
+while [ $(($(date +%s) - STARTED)) -lt "$TIMEOUT" ]; do
+	if upterm session current --admin-socket "$USOCKET" | grep -q 'Connected Client'; then break; fi
+	sleep 1
+done
+
+# Wait for connections to drain
+PREVIOUS=0
+while upterm session current --admin-socket "$USOCKET" 2>/dev/null | grep -q 'Connected Client'; do
+	if [ $(($(date +%s) - PREVIOUS)) -gt 60 ]; then
+		echo "$(date)" - Someone is connected...
+		PREVIOUS=$(date +%s)
+	fi
+	if [ -f ~/.ssh/continue-workflow ]; then
+		# ~/.ssh is the only location which is the same on WSL and the base system, since we explicitly
+		# bind mounted it earlier. This is just a handy place to drop the flag where it can be seen by
+		# this script and also the session which is running outside WSL.
+		rm -f ~/.ssh/continue-workflow
+		trap - EXIT
+		break
+	fi
+	sleep 1
+done

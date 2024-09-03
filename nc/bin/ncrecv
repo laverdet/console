@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+echo "Run this on the sending host: tar cv [files] | nc -nlvp $NETCAT_PORT2"
+$NC "$NETCAT_HOST" "$NETCAT_PORT2" | tar vx

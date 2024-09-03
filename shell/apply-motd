@@ -1,0 +1,55 @@
+#!/bin/sh
+set -eu
+
+# It is ok to have fun.
+
+replace_field() {
+	LENGTH=$3
+	FIELD_LENGTH=${#2}
+	if [ "$LENGTH" -gt "$FIELD_LENGTH" ]; then
+		FRAGMENT=$(printf '\\1%.0s' $(seq $((LENGTH - FIELD_LENGTH))))
+	else
+		FRAGMENT=
+	fi
+	SED_ESCAPED=$(printf '%s\n' "$2" | sed -e 's/[\/&]/\\&/g')
+	sed -E "s/$1/$SED_ESCAPED$FRAGMENT/g"
+}
+
+# Perform template replacements
+MOTD=$(cat; echo .)
+IFS=$(printf '\n\t')
+for TOK_REP in ${2:-}; do
+	TOK=${TOK_REP%:*}
+	SLUG_EXPR="$TOK{2}([^$TOK])"
+	SUBJECT_EXPR="$TOK{3,}(.)"
+	SLUG_COUNT=$(echo "$MOTD" | grep -Eo "$SLUG_EXPR" | wc -l)
+	SUBJECT_LENGTH=$(($(echo "$MOTD" | grep -Eo "$SUBJECT_EXPR" | wc -c) + SLUG_COUNT * 3 - 4))
+	FIELD=$(echo "${TOK_REP##*:}" | cut "-c1-$SUBJECT_LENGTH")
+	FIELD_LENGTH=${#FIELD}
+	DIFF=$((SUBJECT_LENGTH - FIELD_LENGTH))
+	DIV=$((DIFF / SLUG_COUNT))
+	REM=$((DIFF % SLUG_COUNT))
+	MOTD=$(echo "$MOTD" | replace_field "$SUBJECT_EXPR" "$FIELD" $((FIELD_LENGTH + DIV + REM)))
+	MOTD=$(echo "$MOTD" | replace_field "$SLUG_EXPR" '' "$DIV")
+done
+
+# Save to file and add to `.profile`
+if [ ! -f ~/.motd ]; then
+	PROFILE_FILE=.profile
+	case "$1" in
+		*bash*)
+			# Do not create this file if it's not already there!
+			PROFILE_FILE=~/.bash_profile
+			if [ ! -f $PROFILE_FILE ]; then
+				PROFILE_FILE=~/.profile
+			fi
+			;;
+		*pwsh*)
+			mkdir -p ~/Documents/PowerShell
+			PROFILE_FILE=~/Documents/PowerShell/Profile.ps1
+			;;
+		*) PROFILE_FILE=~/.profile ;;
+	esac
+	printf '\ncat ~/.motd\n' >> "$PROFILE_FILE"
+fi
+echo "$MOTD" | sed '$ d' > ~/.motd

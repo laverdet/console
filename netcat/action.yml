@@ -1,0 +1,15 @@
+description: Install some version of netcat
+
+outputs:
+  flavor:
+    value: ${{ steps.setup.outputs.flavor }}
+  nc:
+    value: ${{ steps.setup.outputs.nc }}
+
+runs:
+  using: composite
+  steps:
+    - shell: sh
+      id: setup
+      working-directory: ${{ github.action_path }}/../netcat
+      run: ./setup

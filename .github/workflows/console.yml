@@ -1,0 +1,32 @@
+name: Console
+on: [ push ]
+
+jobs:
+  console:
+    strategy:
+      fail-fast: false
+      matrix:
+        host:
+          - os: ubuntu-latest
+          - os: macos-latest
+          - os: windows-latest
+          - os: ubuntu-latest
+            container: alpine:latest
+          - os: ubuntu-latest
+            container: archlinux:latest
+          - os: ubuntu-latest
+            container: debian:latest
+          - os: ubuntu-latest
+            container: redhat/ubi9
+    name: ${{ matrix.host.os }} ${{ matrix.host.container }}
+    runs-on: ${{ matrix.host.os }}
+    container: ${{ matrix.host.container }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./
+        with:
+          timeout: 5
+      - uses: ./nc
+        with:
+          host: 127.0.0.1
+          timeout: 5

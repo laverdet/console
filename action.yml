@@ -1,0 +1,34 @@
+inputs:
+  timeout:
+    type: number
+    default: 60
+
+runs:
+  using: composite
+  steps:
+    # Common setup
+    - shell: sh
+      id: setup
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      working-directory: ${{ github.action_path }}
+      run: ./setup
+
+    # Linux & macOS
+    - shell: sh
+      if: ${{ runner.os != 'Windows' }}
+      env:
+        SH: ${{ steps.setup.outputs.sh }}
+        TIMEOUT: ${{ inputs.timeout }}
+      run: |
+        "$GITHUB_ACTION_PATH/start" "$SH" "$TIMEOUT"
+
+    # Windows
+    - shell: sh
+      if: ${{ runner.os == 'Windows' }}
+      env:
+        SH: ${{ steps.setup.outputs.sh }}
+        TIMEOUT: ${{ inputs.timeout }}
+      run: |
+        WSL_ACTION_PATH="/$(wsl wslpath -a "'$GITHUB_ACTION_PATH'")"
+        wsl "$WSL_ACTION_PATH/start" pwsh.exe "$TIMEOUT"

@@ -1,0 +1,99 @@
+#!/bin/sh
+set -eu
+NC=nc
+
+# Detect `sudo`
+SUDO=
+if command -v sudo >/dev/null 2>&1; then
+	SUDO=sudo
+fi
+
+# Linux[alpine]
+if command -v apk >/dev/null 2>&1; then
+	echo ::group::Install[apk]
+	# busybox actually includes another nc variant but it doesn't close its pipes so it's hard
+	# to exit cleanly. The OpenBSD variant has the same condition. I get where they're coming
+	# from but there is a missing piece which makes avoiding deadlocks impossible.
+	# 1) nc -lvnp 4444
+	# 2) rm -f console; mkfifo console; nc 127.0.0.1 4444 >console
+	# 3) cat console
+	# 4) (kill 1)
+	# 5) (`cat console` does not terminate)
+	# Closing the net socket should close stdout on nc, but it does not. I'm not sure it's even
+	# possible with bash pipes.
+	# Anyway, we can use `nmap-ncat` instead since traditional `nc` is not available on Alpine.
+	$SUDO apk add nmap-ncat
+	NC=ncat
+	echo ::endgroup::
+fi
+
+# Linux[arch]
+if command -v pacman >/dev/null 2>&1; then
+	echo ::group::Install'[pacman]'
+	$SUDO pacman -Syu --noconfirm gnu-netcat
+	echo ::endgroup::
+fi
+
+# Linux[debian/ubuntu]
+if command -v apt-get >/dev/null 2>&1; then
+	echo ::group::Install[apt]
+	$SUDO apt-get -qq update
+	$SUDO apt-get -qq install -y netcat-traditional
+	$SUDO update-alternatives --set nc /bin/nc.traditional
+	echo ::endgroup::
+fi
+
+# Linux[redhat]
+if command -v yum >/dev/null 2>&1; then
+	echo ::group::Install[yum]
+  $SUDO yum -q install -y nmap-ncat
+	echo ::endgroup::
+fi
+
+# macOS
+if command -v brew >/dev/null 2>&1; then
+	echo ::group::Install[brew]
+	brew install netcat
+	NC_PATH=$(brew --prefix)/bin/nc
+	NC_PATH=$(/bin/realpath "$NC_PATH")
+	NC_PATH=$(dirname "$NC_PATH")
+	echo "$NC_PATH" >> "$GITHUB_PATH"
+	PATH=$NC_PATH:$PATH
+	echo ::endgroup::
+fi
+
+# Windows
+if [ "$RUNNER_OS" = Windows ]; then
+	NC=nc64.exe
+	NC_PATH=$PWD/bin
+	echo "$NC_PATH" >> "$GITHUB_PATH"
+	PATH=$NC_PATH:$PATH
+fi
+
+# Show help message
+command -v "$NC"
+$NC -h || true # nc64.exe has non-zero for `-h`
+
+# Taste test
+HELP=$($NC -h 2>&1 | head -n2 || true)
+FLAVOR=unknown
+if echo "$HELP" | grep -Eq 'GNU netcat'; then
+	FLAVOR=gnu
+elif echo "$HELP" | grep -q 'OpenBSD netcat'; then
+	FLAVOR=openbsd
+elif echo "$HELP" | grep -q 'Ncat'; then
+	FLAVOR=nmap
+elif echo "$HELP" | grep -q 'BusyBox'; then
+	FLAVOR=busybox
+elif echo "$HELP" | grep -q NT; then
+	FLAVOR=traditional-nt
+elif echo "$HELP" | grep -Eq v1.10; then
+	FLAVOR=traditional
+elif echo "$HELP" | grep -q 'apple'; then
+	FLAVOR=apple
+fi
+echo "Netcat Flavor: $FLAVOR"
+
+# Outputs
+echo "flavor=$FLAVOR" >> "$GITHUB_OUTPUT"
+echo "nc=$NC" >> "$GITHUB_OUTPUT"

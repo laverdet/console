@@ -1,0 +1,35 @@
+description: No frills reverse tunnel over `nc(1)`
+
+inputs:
+  host:
+    type: string
+    description: Remote host `8.8.8.8` / `example.com` / `::1`
+    required: true
+  port:
+    type: string
+    description: Remote port `2323` / `2323+2324` (for `ncsend`)
+    default: 2323+2324
+  timeout:
+    type: number
+    description: No connection timeout in seconds
+    default: 60
+
+runs:
+  using: composite
+  steps:
+    # Setup netcat
+    - shell: sh
+      id: netcat
+      working-directory: ${{ github.action_path }}/../netcat
+      run: ./setup
+
+    # Connect to host
+    - shell: sh
+      env:
+        NC_FLAVOR: ${{ steps.netcat.outputs.flavor }}
+        NC: ${{ steps.netcat.outputs.nc }}
+        NETCAT_HOST: ${{ inputs.host }}
+        PORTS: ${{ inputs.port }}
+        TIMEOUT: ${{ inputs.timeout }}
+      run: |
+        "$GITHUB_ACTION_PATH/connect" "$GITHUB_ACTION_PATH/.."
