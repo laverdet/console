@@ -10,6 +10,8 @@ USOCKET=~/.upterm/console$$
 # variable which can be very confusing during development of this tool.
 unset UPTERM_ADMIN_SOCKET
 
+env
+
 # Start daemonized upterm
 # nb: `pwsh.exe` does not support contracted `-il` argument, so make sure to use `-i -l` instead.
 # You also shouldn't need the `-i` flag since the shell should detect the pty but it sometimes
