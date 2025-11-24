@@ -7,6 +7,17 @@ if command -v sudo >/dev/null 2>&1; then
 	SUDO=sudo
 fi
 
+# Parse platform & arch
+PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
+case $PLATFORM in
+	mingw64_nt-*) PLATFORM=win32 ;;
+esac
+ARCH=$(uname -m)
+case $ARCH in
+	aarch64) ARCH=arm64 ;;
+	x86_64) ARCH=amd64 ;;
+esac
+
 # Someone dumped `nvm.sh` into `.bash_profile` on the Ubuntu GitHub action runner, which prevents
 # `.profile` from being loaded. But `.profile` is where the distribution puts all its nice color
 # settings.
@@ -15,63 +26,68 @@ if [ -f ~/.bash_profile ] && ! grep -qv nvm.sh ~/.bash_profile; then
 	rm ~/.bash_profile
 fi
 
-# Linux[alpine]
-if command -v apk >/dev/null 2>&1; then
-	echo ::group::Install dependencies[apk] - console
-	$SUDO apk add bind-tools curl jq openssh
-	echo ::endgroup::
-fi
 
-# Linux[arch]
-if command -v pacman >/dev/null 2>&1; then
-	echo ::group::Install dependencies[arch] - console
-	$SUDO pacman -Syu --noconfirm bind curl jq openssh
-	echo ::endgroup::
-fi
+case "$PLATFORM" in
+	linux)
+		# Linux[alpine]
+		if command -v apk >/dev/null 2>&1; then
+			echo ::group::Install dependencies[apk] - console
+			$SUDO apk add bind-tools curl jq openssh
+			echo ::endgroup::
+		fi
 
-# Linux[debian/ubuntu]
-if command -v apt-get >/dev/null 2>&1; then
-	APT_PACKAGES='curl dnsutils jq ssh'
-	# shellcheck disable=SC2086
-	if dpkg --get-selections $APT_PACKAGES 2>&1 | grep -qv 'install$'; then
-		# We ~probably~ have these installed, so run a quick test to maybe skip `apt-get update`
-		echo ::group::Install dependencies[apt] - console
-		$SUDO apt-get -qq update
-		$SUDO apt-get -qq install -y $APT_PACKAGES
+		# Linux[arch]
+		if command -v pacman >/dev/null 2>&1; then
+			echo ::group::Install dependencies[arch] - console
+			$SUDO pacman -Syu --noconfirm bind curl jq openssh
+			echo ::endgroup::
+		fi
+
+		# Linux[debian/ubuntu]
+		if command -v apt-get >/dev/null 2>&1; then
+			APT_PACKAGES='curl dnsutils jq ssh'
+			# shellcheck disable=SC2086
+			if dpkg --get-selections $APT_PACKAGES 2>&1 | grep -qv 'install$'; then
+				# We ~probably~ have these installed, so run a quick test to maybe skip `apt-get update`
+				echo ::group::Install dependencies[apt] - console
+				$SUDO apt-get -qq update
+				$SUDO apt-get -qq install -y $APT_PACKAGES
+				echo ::endgroup::
+			fi
+		fi
+
+		# Linux[redhat]
+		if command -v yum >/dev/null 2>&1; then
+			echo ::group::Install dependencies[yum] - console
+			$SUDO yum -q install -y bind-utils curl-minimal jq openssh-clients
+			echo ::endgroup::
+		fi
+		;;
+
+	# Windows
+	win32)
+		# Download & install Debian WSL
+		echo ::group::Install Debian WSL
+		mkdir "$RUNNER_TOOL_CACHE/debian-wsl"
+		cd "$RUNNER_TOOL_CACHE/debian-wsl"
+		curl -fsSL https://aka.ms/wsl-debian-gnulinux -o "debian.zip"
+		X64_ZIP=$(unzip -l debian.zip | awk 'NR > 3 {print $4}' | grep x64)
+		unzip debian.zip "$X64_ZIP"
+		unzip "$X64_ZIP"
+		./debian.exe install --root
+		cd -
 		echo ::endgroup::
-	fi
-fi
 
-# Linux[redhat]
-if command -v yum >/dev/null 2>&1; then
-	echo ::group::Install dependencies[yum] - console
-	$SUDO yum -q install -y bind-utils curl-minimal jq openssh-clients
-	echo ::endgroup::
-fi
+		# Link Windows user .ssh directory to WSL root user. You can't do the whole home directory because
+		# it breaks sockets.
+		mkdir -p ~/.ssh
+		wsl mkdir -p //root/.ssh
+		wsl mount --bind "/$(wsl wslpath -u "$HOME")/.ssh" //root/.ssh
 
-# Windows
-if uname | grep -q MINGW64_NT; then
-	# Download & install Debian WSL
-	echo ::group::Install Debian WSL
-	mkdir "$RUNNER_TOOL_CACHE/debian-wsl"
-	cd "$RUNNER_TOOL_CACHE/debian-wsl"
-	curl -fsSL https://aka.ms/wsl-debian-gnulinux -o "debian.zip"
-	X64_ZIP=$(unzip -l debian.zip | awk 'NR > 3 {print $4}' | grep x64)
-	unzip debian.zip "$X64_ZIP"
-	unzip "$X64_ZIP"
-	./debian.exe install --root
-	cd -
-	echo ::endgroup::
-
-	# Link Windows user .ssh directory to WSL root user. You can't do the whole home directory because
-	# it breaks sockets.
-	mkdir -p ~/.ssh
-	wsl mkdir -p //root/.ssh
-	wsl mount --bind "/$(wsl wslpath -u "$HOME")/.ssh" //root/.ssh
-
-	# Convert entry back to sane line encoding since it will run in WSL
-	dos2unix start
-fi
+		# Convert entry back to sane line encoding since it will run in WSL
+		dos2unix start
+		;;
+esac
 
 # Add `bin` to PATH
 echo "$GITHUB_ACTION_PATH/bin" >> "$GITHUB_PATH"
@@ -89,21 +105,15 @@ curl -H "Authorization: Bearer $GITHUB_TOKEN" -fsSL \
 	"https://api.github.com/users/$GITHUB_TRIGGERING_ACTOR/keys" | \
 	jq -r '.[] | .key' >> ~/.ssh/authorized_keys
 
-# Parse platform & arch
-PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
-case $PLATFORM in
-	mingw64_nt-*) PLATFORM=linux ;;
-esac
-ARCH=$(uname -m)
-case $ARCH in
-	aarch64) ARCH=arm64 ;;
-	x86_64) ARCH=amd64 ;;
-esac
-
 # Download & install upterm
 # Last known good release: v0.13.3
 # https://github.com/owenthereal/upterm/issues/288
-URL=https://github.com/owenthereal/upterm/releases/download/v0.13.3/upterm_"$PLATFORM"_"$ARCH".tar.gz
+UPTERM_DIST="$PLATFORM"_"$ARCH"
+case $PLATFORM in
+	# nb: win32 uses wsl
+	win32) UPTERM_DIST="linux_$ARCH" ;;
+esac
+URL="https://github.com/owenthereal/upterm/releases/download/v0.13.3/upterm_$UPTERM_DIST.tar.gz"
 mkdir "$RUNNER_TOOL_CACHE/upterm"
 curl -fsSL "$URL" | tar xz -C "$RUNNER_TOOL_CACHE/upterm" upterm
 echo "$RUNNER_TOOL_CACHE/upterm" >> "$GITHUB_PATH"
