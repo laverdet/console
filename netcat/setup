@@ -30,7 +30,7 @@ fi
 # Linux[arch]
 if command -v pacman >/dev/null 2>&1; then
 	echo ::group::Install'[pacman]'
-	$SUDO pacman -Syu --noconfirm gnu-netcat
+	$SUDO pacman -Syu --noconfirm openbsd-netcat
 	echo ::endgroup::
 fi
 
