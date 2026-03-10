@@ -139,6 +139,7 @@ trap 'kill $UPTERM_PID || true' EXIT
 STARTED=$(date +%s)
 while [ ! -e "$SOCKET_PATH_LINK" ] && [ $(($(date +%s) - STARTED)) -lt 2 ]; do sleep 0.1; done
 USOCKET=$(readlink "$SOCKET_PATH_LINK")
+echo "Upterm admin socket: $USOCKET"
 rm -f "$SOCKET_PATH_LINK"
 if [ ! -e "$USOCKET" ]; then
 	echo "Failed to start upterm host"
