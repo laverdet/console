@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-if uname | grep -q MINGW64_NT && command -v pwsh.exe >/dev/null 2>&1; then
+if uname -o | grep -q Msys && command -v pwsh.exe >/dev/null 2>&1; then
 	command -v pwsh.exe
 elif command -v getent >/dev/null 2>&1; then
 	getent passwd "$(whoami)" | cut -d: -f7
