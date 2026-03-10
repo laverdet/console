@@ -121,7 +121,7 @@ case "$REMOTE_COMMAND" in
 esac
 if [ "$PLATFORM" = windows ]; then
 	# shellcheck disable=SC2016
-	LOCAL_COMMAND='ln -s "$(cygpath -u "$UPTERM_ADMIN_SOCKET")" > "'"$SOCKET_PATH_LINK"'"; tail -f /dev/null'
+	LOCAL_COMMAND='ln -s "$(cygpath -u "$UPTERM_ADMIN_SOCKET")" "'"$SOCKET_PATH_LINK"'"; tail -f /dev/null'
 else
 	# shellcheck disable=SC2016
 	LOCAL_COMMAND='ln -s "$UPTERM_ADMIN_SOCKET" "'"$SOCKET_PATH_LINK"'"; tail -f /dev/null'
