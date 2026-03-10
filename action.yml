@@ -6,22 +6,11 @@ inputs:
 runs:
   using: composite
   steps:
-    # Common setup
     - shell: sh
-      id: setup
+      working-directory: ${{ github.action_path }}
       env:
         GITHUB_TOKEN: ${{ github.token }}
-      working-directory: ${{ github.action_path }}
-      run: ./setup
-
-    # Start console
-    - shell: sh
-      env:
         SH: ${{ steps.setup.outputs.sh }}
         TIMEOUT: ${{ inputs.timeout }}
       run: |
-        if [ ${{ runner.os == 'Windows' }} ]; then
-          "$GITHUB_ACTION_PATH/start" pwsh.exe "$TIMEOUT"
-        else
-          "$GITHUB_ACTION_PATH/start" "$SH" "$TIMEOUT"
-        fi
+        "$GITHUB_ACTION_PATH/start"
