@@ -1,0 +1,23 @@
+#!/bin/sh
+set -eu
+VERSION=0.22.0
+RELEASES="
+darwin_amd64
+darwin_arm64
+linux_386
+linux_amd64
+linux_arm64
+linux_armv6
+windows_amd64
+windows_arm64
+windows_armv6
+"
+
+for ATOM in $RELEASES; do
+  echo "$ATOM"
+  mkdir -p "$ATOM"
+  curl -fsSL "https://github.com/owenthereal/upterm/releases/download/v$VERSION/upterm_$ATOM.tar.gz" | tar xz -C "$ATOM"
+  rm -rf "${ATOM:?}/docs" "${ATOM:?}/etc" "${ATOM:?}/README.md"
+  mv "$ATOM/LICENSE" ./
+done
+

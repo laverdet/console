@@ -51,11 +51,8 @@ while upterm session current --admin-socket "$USOCKET" 2>/dev/null | grep -q 'Co
 		echo "$(date)" - Someone is connected...
 		PREVIOUS=$(date +%s)
 	fi
-	if [ -f ~/.ssh/continue-workflow ]; then
-		# ~/.ssh is the only location which is the same on WSL and the base system, since we explicitly
-		# bind mounted it earlier. This is just a handy place to drop the flag where it can be seen by
-		# this script and also the session which is running outside WSL.
-		rm -f ~/.ssh/continue-workflow
+	if [ -f ~/.continue-workflow ]; then
+		rm -f ~/.continue-workflow
 		trap - EXIT
 		break
 	fi

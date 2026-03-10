@@ -8,14 +8,17 @@ if command -v sudo >/dev/null 2>&1; then
 fi
 
 # Parse platform & arch
-PLATFORM=$(uname -s | tr '[:upper:]' '[:lower:]')
-case $PLATFORM in
-	mingw64_nt-*) PLATFORM=win32 ;;
+case $(uname -o) in
+	Darwin)
+		PLATFORM=darwin ;;
+	Linux|GNU/Linux)
+		PLATFORM=linux ;;
+	Msys)
+		PLATFORM=windows ;;
 esac
-ARCH=$(uname -m)
-case $ARCH in
-	aarch64) ARCH=arm64 ;;
-	x86_64) ARCH=amd64 ;;
+case $(uname -m) in
+	aarch64|arm64) ARCH=arm64 ;;
+	amd64|x86_64) ARCH=amd64 ;;
 esac
 
 # Someone dumped `nvm.sh` into `.bash_profile` on the Ubuntu GitHub action runner, which prevents
@@ -26,7 +29,7 @@ if [ -f ~/.bash_profile ] && ! grep -qv nvm.sh ~/.bash_profile; then
 	rm ~/.bash_profile
 fi
 
-
+# Install dependencies
 case "$PLATFORM" in
 	linux)
 		# Linux[alpine]
@@ -63,34 +66,11 @@ case "$PLATFORM" in
 			echo ::endgroup::
 		fi
 		;;
-
-	# Windows
-	win32)
-		# Download & install Debian WSL
-		echo ::group::Install Debian WSL
-		mkdir "$RUNNER_TOOL_CACHE/debian-wsl"
-		cd "$RUNNER_TOOL_CACHE/debian-wsl"
-		curl -fsSL https://aka.ms/wsl-debian-gnulinux -o "debian.zip"
-		X64_ZIP=$(unzip -l debian.zip | awk 'NR > 3 {print $4}' | grep x64)
-		unzip debian.zip "$X64_ZIP"
-		unzip "$X64_ZIP"
-		./debian.exe install --root
-		cd -
-		echo ::endgroup::
-
-		# Link Windows user .ssh directory to WSL root user. You can't do the whole home directory because
-		# it breaks sockets.
-		mkdir -p ~/.ssh
-		wsl mkdir -p //root/.ssh
-		wsl mount --bind "/$(wsl wslpath -u "$HOME")/.ssh" //root/.ssh
-
-		# Convert entry back to sane line encoding since it will run in WSL
-		dos2unix start
-		;;
 esac
 
 # Add `bin` to PATH
 echo "$GITHUB_ACTION_PATH/bin" >> "$GITHUB_PATH"
+echo "$GITHUB_ACTION_PATH/upterm/${PLATFORM}_${ARCH}" >> "$GITHUB_PATH"
 
 # Locate shell, apply motd
 MOTD_TOKENS="X:${GITHUB_REPOSITORY##*/}
@@ -104,19 +84,6 @@ mkdir -p ~/.ssh
 curl -H "Authorization: Bearer $GITHUB_TOKEN" -fsSL \
 	"https://api.github.com/users/$GITHUB_TRIGGERING_ACTOR/keys" | \
 	jq -r '.[] | .key' >> ~/.ssh/authorized_keys
-
-# Download & install upterm
-# Last known good release: v0.13.3
-# https://github.com/owenthereal/upterm/issues/288
-UPTERM_DIST="$PLATFORM"_"$ARCH"
-case $PLATFORM in
-	# nb: win32 uses wsl
-	win32) UPTERM_DIST="linux_$ARCH" ;;
-esac
-URL="https://github.com/owenthereal/upterm/releases/download/v0.13.3/upterm_$UPTERM_DIST.tar.gz"
-mkdir "$RUNNER_TOOL_CACHE/upterm"
-curl -fsSL "$URL" | tar xz -C "$RUNNER_TOOL_CACHE/upterm" upterm
-echo "$RUNNER_TOOL_CACHE/upterm" >> "$GITHUB_PATH"
 
 # Setup upterm keys
 if [ ! -f ~/.ssh/upterm ]; then
