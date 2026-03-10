@@ -20,7 +20,7 @@ runs:
         SH: ${{ steps.setup.outputs.sh }}
         TIMEOUT: ${{ inputs.timeout }}
       run: |
-        if [ ${{ runner.os = 'Windows' }} ]; then
+        if [ ${{ runner.os == 'Windows' }} ]; then
           "$GITHUB_ACTION_PATH/start" pwsh.exe "$TIMEOUT"
         else
           "$GITHUB_ACTION_PATH/start" "$SH" "$TIMEOUT"
