@@ -103,7 +103,7 @@ fi
 ssh-keyscan "$UPTERM_IP" 2>/dev/null >> ~/.ssh/known_hosts
 
 # Socket paths are named based on current pid, so we know where to find them easily.
-# On Windows we can't rename it, so instead the file will contain a location
+# We'll make this a symlink pointing to the socket that upterm created.
 SOCKET_PATH_LINK=~/.upterm-socket-$$
 
 # Not needed but just a reminder. `upterm` will not overwrite an existing socket environment
@@ -121,7 +121,7 @@ case "$REMOTE_COMMAND" in
 esac
 if [ "$PLATFORM" = windows ]; then
 	# shellcheck disable=SC2016
-	LOCAL_COMMAND='ln -s "$(wslpath "$UPTERM_ADMIN_SOCKET")" "'"$SOCKET_PATH_LINK"'"; tail -f /dev/null'
+	LOCAL_COMMAND='ln -s "$(cygpath -u "$UPTERM_ADMIN_SOCKET")" > "'"$SOCKET_PATH_LINK"'"; tail -f /dev/null'
 else
 	# shellcheck disable=SC2016
 	LOCAL_COMMAND='ln -s "$UPTERM_ADMIN_SOCKET" "'"$SOCKET_PATH_LINK"'"; tail -f /dev/null'
