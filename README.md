@@ -2,11 +2,19 @@
 
 This action creates a reverse shell from your GitHub job which can help with debugging your
 workflows. You will be able to SSH into your runner to poke around and figure out what is happening.
+The reverse shells are implemented via [owenthereal/upterm](https://github.com/owenthereal/upterm)
+or plain old netcat, if you want.
 
-It should work on a great deal of various GitHub runner configurations. It is compatible with
-**Linux**, **macOS** & **Windows** runners. There are very few dependencies so it will also work in
-containerized **Docker** jobs even lightweight distributions like **Alpine** and **Arch**. Take a
-look at the [test
+You can also use [owenthereal/action-upterm](https://github.com/owenthereal/action-upterm), by the
+author of upterm which is also great. But I'm going to be honest with you, I've been using Linux for
+20 years and I don't know how to use terminal multiplexers. I also find that they often interfere
+with vim or other fancy ncurses utilities. This action just gives you a plain ssh interface. If you
+want a new window you can open a new terminal on your computer and ssh in again.
+
+Anyway, it should work on a great deal of various GitHub runner configurations. It is compatible
+with **Linux**, **macOS** & **Windows** runners. There are very few dependencies so it will also
+work in containerized **Docker** jobs even lightweight distributions like **Alpine** and **Arch**.
+Take a look at the [test
 matrix](https://github.com/laverdet/console/blob/main/.github/workflows/console.yml).
 
 The best shell strategy is [upterm](https://upterm.dev) which provides a pseudo-terminal and free
