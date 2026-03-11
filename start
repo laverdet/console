@@ -116,6 +116,7 @@ unset UPTERM_ADMIN_SOCKET
 # nb: `pwsh.exe` does not support contracted `-il` argument, so make sure to use `-i -l` instead.
 # You also shouldn't need the `-i` flag since the shell should detect the pty but it sometimes
 # doesn't work, and doesn't hurt to add otherwise.
+cd "$GITHUB_WORKSPACE"
 case "$SH" in
 	*pwsh.exe)
 		# Trampoline off `sh` first which does a better job of picking up terminal features.
